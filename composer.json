@@ -1,0 +1,16 @@
+{
+    "name": "sauth/core",
+    "description": "Sauth Library",
+    "keywords": ["sauth", "auth"],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Dmitry Nehaychik",
+            "email": "4dmitr@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.3.0"
+    }
+}
