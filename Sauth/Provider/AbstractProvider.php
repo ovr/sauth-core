@@ -2,6 +2,8 @@
 
 namespace Sauth\Provider;
 
+use Sauth\Exception\InvalidArgumentException;
+
 abstract class AbstractProvider
 {
 
@@ -19,6 +21,78 @@ abstract class AbstractProvider
     public function __construct(array $configuration = array())
     {
         $this->setConfiguration($configuration);
+    }
+
+    public function authenticate()
+    {
+
+        // first step is to verify provider configuration
+        if (!$this->validateConfiguration()) {
+            throw new InvalidArgumentException("Wrong provider configuration, please verify it.");
+        }
+
+        if ($this->isRedirectStep()) {
+            // here we are redirecting user in his browser
+            $this->doRedirectStep();
+
+        } else if($this->isRequestStep()) {
+            $result = $this->doRequestStep();
+
+        } else {
+            // if we are here that's mean something went wrong
+            $result = $this->doErrorStep();
+        }
+
+        return $this->prepareResult($result);
+    }
+
+    public function doErrorStep()
+    {
+        return array(
+            "success" => false,
+            "message" => "Something went wrong",
+        );
+    }
+
+    public abstract function isRedirectStep();
+    public abstract function doRedirectStep();
+
+    public abstract function isRequestStep();
+    public abstract function doRequestStep();
+
+    public abstract function validateConfiguration();
+
+    /**
+     * Prepare result for the output.
+     * It always return success and message keys.
+     * On success it also returns credentials and all required user data.
+     *
+     * @param array $result
+     * @return array
+     */
+    public final function prepareResult(array $result)
+    {
+
+        $return = array(
+            'success' => $result['success'],
+            'message' => $result['message'],
+        );
+
+        if ($result['success']) {
+
+            $return['required'] = array(
+                'uid' => $result['uid'],
+                'username' => $result['username'],
+                'email' => $result['email'],
+                'fullName' => $result['fullName'],
+            );
+
+            $return['credentials'] = $result['credentials'];
+            $return['user'] = $result['user'];
+            $return['other'] = $result['other'];
+        }
+
+        return $return;
     }
 
     /**
