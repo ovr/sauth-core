@@ -14,15 +14,20 @@ class Oauth2 extends AbstractProvider
      */
     public function validateConfiguration()
     {
-        //TODO: check the required parameters
-        return true;
+        $configuration = $this->getConfiguration();
+
+        return !empty($configuration['authorizationUri'])
+            && !empty($configuration['accessTokenUri'])
+            && !empty($configuration['clientId'])
+            && !empty($configuration['responseType'])
+            && !empty($configuration['redirectUri']);
     }
 
     /**
      * Checks current step
      * @return bool
      */
-    public function isRedirectStep()
+    public function isAuthorizeStep()
     {
         return empty($_GET['code']) && empty($_GET['error']);
     }
@@ -30,11 +35,12 @@ class Oauth2 extends AbstractProvider
     /**
      * Do Authorization Request
      * @url http://tools.ietf.org/html/draft-ietf-oauth-v2-28#section-4.1.1
+     * @exit
      */
-    public function doRedirectStep()
+    public function doAuthorizeStep()
     {
-        $url = $this->getAuthorizationUrl();
-        $url .= http_build_query($this->getAuthorizationParameters(), null, '&');
+        $url = $this->getAuthorizationUri();
+        $url .= '?' . http_build_query($this->getAuthorizationParameters(), null, '&');
 
         header('Location: ' . $url);
         exit(1);
@@ -44,7 +50,7 @@ class Oauth2 extends AbstractProvider
      * Checks current step
      * @return bool
      */
-    public function isRequestStep()
+    public function isAccessStep()
     {
         return !empty($_GET['code']);
     }
@@ -54,21 +60,31 @@ class Oauth2 extends AbstractProvider
      * @url http://tools.ietf.org/html/draft-ietf-oauth-v2-28#section-4.1.3
      * @return array Ready for prepareResult
      */
-    public function doRequestStep()
+    public function doAccessStep()
     {
         $code = $_GET['code'];
-        $url = $this->getAccessTokenUrl();
+
+        $url = $this->getAccessTokenUri();
         $parameters = $this->getAccessTokenParameters($code);
 
-        $result = array();
+        $result = false;
         $response = Util::postRequest($url, $parameters);
 
-        if ($response) {
-            $result = array();
-        } else {
-            $result = parent::doErrorStep();
+        if ($response && empty($response['error'])) {
+            $result = $this->requestUserData($response);
         }
+
         return $result;
+    }
+
+    /**
+     * Requests user data and prepares response to the doResultStep function
+     * @abstract
+     * @param $response
+     * @return mixed
+     */
+    public function requestUserData($response) {
+        return array('success' => true, 'message' => 'Success', 'credentials' => array('accessToken' => $response['access_token']));
     }
 
     /**
@@ -109,7 +125,7 @@ class Oauth2 extends AbstractProvider
         }
 
         if ($this->getConfiguration('scope')) {
-            $result['scope'] = mplode($this->getConfiguration('scope'), ',');;
+            $result['scope'] = implode($this->getConfiguration('scope'), ',');
         }
 
         if ($this->getConfiguration('state')) {
@@ -122,9 +138,9 @@ class Oauth2 extends AbstractProvider
      * Returns authorization url
      * @return mixed
      */
-    public function getAuthorizationUrl()
+    public function getAuthorizationUri()
     {
-        return $this->getConfiguration('authorizationUrl');
+        return $this->getConfiguration('authorizationUri');
     }
 
     /**
@@ -138,6 +154,9 @@ class Oauth2 extends AbstractProvider
             'grant_type' => 'authorization_code',
             'code' => $code,
             'redirect_uri' => $this->getConfiguration('redirectUri'),
+            // I'm not sure about two parameters bellow, but most popular oauth2 servers require them
+            'client_id' => $this->getConfiguration('clientId'),
+            'client_secret' => $this->getConfiguration('clientSecret'),
         );
         return $result;
     }
@@ -146,8 +165,8 @@ class Oauth2 extends AbstractProvider
      * Returns access token url
      * @return mixed
      */
-    public function getAccessTokenUrl()
+    public function getAccessTokenUri()
     {
-        return $this->getConfiguration('accessTokenUrl');
+        return $this->getConfiguration('accessTokenUri');
     }
 }

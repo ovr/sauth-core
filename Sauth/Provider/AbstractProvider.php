@@ -25,25 +25,26 @@ abstract class AbstractProvider
 
     public function authenticate()
     {
-
         // first step is to verify provider configuration
         if (!$this->validateConfiguration()) {
-            throw new InvalidArgumentException("Wrong provider configuration, please verify it.");
+            throw new InvalidArgumentException('Wrong provider configuration, please verify it.');
         }
 
-        if ($this->isRedirectStep()) {
-            // here we are redirecting user in his browser
-            $this->doRedirectStep();
+        $result = false;
+        if ($this->isAuthorizeStep()) {
+            // here we are redirecting user
+            $this->doAuthorizeStep();
 
-        } else if($this->isRequestStep()) {
-            $result = $this->doRequestStep();
+        } else if($this->isAccessStep()) {
+            // access token  and user data request
+            $result = $this->doAccessStep();
+        }
 
-        } else {
-            // if we are here that's mean something went wrong
+        if (!$result) {
             $result = $this->doErrorStep();
         }
 
-        return $this->prepareResult($result);
+        return $this->doResultStep($result);
     }
 
     public function doErrorStep()
@@ -54,45 +55,43 @@ abstract class AbstractProvider
         );
     }
 
-    public abstract function isRedirectStep();
-    public abstract function doRedirectStep();
+    public abstract function isAuthorizeStep();
+    public abstract function doAuthorizeStep();
 
-    public abstract function isRequestStep();
-    public abstract function doRequestStep();
+    public abstract function isAccessStep();
+    public abstract function doAccessStep();
 
     public abstract function validateConfiguration();
 
     /**
-     * Prepare result for the output.
+     * Formats result for the output.
      * It always return success and message keys.
      * On success it also returns credentials and all required user data.
      *
      * @param array $result
      * @return array
      */
-    public final function prepareResult(array $result)
+    public final function doResultStep(array $result)
     {
 
-        $return = array(
+        $data = array(
             'success' => $result['success'],
             'message' => $result['message'],
         );
 
         if ($result['success']) {
 
-            $return['required'] = array(
+            $data['required'] = array(
                 'uid' => $result['uid'],
-                'username' => $result['username'],
-                'email' => $result['email'],
-                'fullName' => $result['fullName'],
+                'userName' => $result['userName'],
             );
 
-            $return['credentials'] = $result['credentials'];
-            $return['user'] = $result['user'];
-            $return['other'] = $result['other'];
+            $data['credentials'] = $result['credentials'];
+            $data['user'] = $result['user'];
+            $data['additional'] = $result['additional'];
         }
 
-        return $return;
+        return $data;
     }
 
     /**
